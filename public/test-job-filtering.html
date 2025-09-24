@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎯 TEST JOB-SPECIFIC CANDIDATES</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .header { background: #28a745; color: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+        .test { background: white; border: 2px solid #007cba; margin: 15px 0; padding: 15px; border-radius: 8px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { padding: 12px 20px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .btn-primary { background: #007cba; color: white; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+        th { background: #f8f9fa; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🎯 TEST: Job-Specific Candidate Filtering</h1>
+        <p>This will test if candidates are properly associated with specific jobs</p>
+    </div>
+    
+    <div class="test">
+        <h2>Step 1: Force Fresh Database</h2>
+        <button onclick="forceFreshDatabase()" class="btn-danger">🔄 Clear Database & Reseed</button>
+        <div id="reseed-result" class="result"></div>
+    </div>
+    
+    <div class="test">
+        <h2>Step 2: Test Job-Specific Filtering</h2>
+        <button onclick="testJobSpecificCandidates()" class="btn-primary">🧪 Test All Jobs</button>
+        <div id="job-test-result" class="result"></div>
+    </div>
+    
+    <div class="test">
+        <h2>Step 3: Test User Workflow</h2>
+        <button onclick="testUserWorkflow()" class="btn-success">🎯 Test Get Started → Jobs → Candidates</button>
+        <div id="workflow-result" class="result"></div>
+    </div>
+
+    <script>
+        async function forceFreshDatabase() {
+            const resultDiv = document.getElementById('reseed-result');
+            resultDiv.innerHTML = '<div class="warning">🔄 Clearing database and reseeding...</div>';
+            
+            try {
+                // Clear IndexedDB
+                const databases = await indexedDB.databases();
+                for (const db of databases) {
+                    if (db.name === 'MyMockDatabase') {
+                        const deleteRequest = indexedDB.deleteDatabase(db.name);
+                        await new Promise((resolve) => {
+                            deleteRequest.onsuccess = resolve;
+                            deleteRequest.onerror = resolve;
+                            deleteRequest.onblocked = resolve;
+                        });
+                    }
+                }
+                
+                resultDiv.innerHTML = '<div class="success">✅ Database cleared! Reloading to trigger fresh seed with job-specific logic...</div>';
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function testJobSpecificCandidates() {
+            const resultDiv = document.getElementById('job-test-result');
+            resultDiv.innerHTML = '<div>🔍 Testing job-specific candidate filtering...</div>';
+            
+            try {
+                // Get all jobs
+                const jobsResponse = await fetch('/api/jobs?page=1&pageSize=25');
+                if (!jobsResponse.ok) {
+                    throw new Error(`Jobs API failed: ${jobsResponse.status}`);
+                }
+                const jobsData = await jobsResponse.json();
+                const jobs = jobsData.data;
+                
+                let testResults = `<div class="success">✅ Found ${jobs.length} jobs</div>`;
+                testResults += `<h3>Job-Specific Candidate Test Results:</h3>`;
+                testResults += `<table><tr><th>Job ID</th><th>Job Title</th><th>Candidates</th><th>Sample Names</th><th>Status</th></tr>`;
+                
+                let totalCandidatesAcrossJobs = 0;
+                let jobsWithCandidates = 0;
+                let jobsWithoutCandidates = 0;
+                
+                for (let i = 0; i < Math.min(10, jobs.length); i++) {
+                    const job = jobs[i];
+                    try {
+                        const candidatesResponse = await fetch(`/api/jobs/${job.id}/candidates?stage=all`);
+                        if (candidatesResponse.ok) {
+                            const candidates = await candidatesResponse.json();
+                            totalCandidatesAcrossJobs += candidates.length;
+                            
+                            const sampleNames = candidates.slice(0, 3).map(c => c.name).join(', ');
+                            const statusClass = candidates.length === 0 ? 'error' : 'success';
+                            const statusText = candidates.length === 0 ? '❌ NO CANDIDATES' : `✅ ${candidates.length} candidates`;
+                            
+                            if (candidates.length > 0) {
+                                jobsWithCandidates++;
+                                // Verify all candidates have correct jobId
+                                const wrongJobId = candidates.find(c => c.jobId !== job.id);
+                                if (wrongJobId) {
+                                    testResults += `<tr class="error"><td>${job.id}</td><td>${job.title}</td><td>${candidates.length}</td><td>${sampleNames}</td><td>❌ WRONG JOB ID: Found candidate with jobId ${wrongJobId.jobId}</td></tr>`;
+                                } else {
+                                    testResults += `<tr class="success"><td>${job.id}</td><td>${job.title}</td><td>${candidates.length}</td><td>${sampleNames}</td><td>${statusText}</td></tr>`;
+                                }
+                            } else {
+                                jobsWithoutCandidates++;
+                                testResults += `<tr class="error"><td>${job.id}</td><td>${job.title}</td><td>0</td><td>-</td><td>${statusText}</td></tr>`;
+                            }
+                        } else {
+                            testResults += `<tr class="error"><td>${job.id}</td><td>${job.title}</td><td>-</td><td>-</td><td>❌ API Error ${candidatesResponse.status}</td></tr>`;
+                        }
+                    } catch (error) {
+                        testResults += `<tr class="error"><td>${job.id}</td><td>${job.title}</td><td>-</td><td>-</td><td>❌ Error: ${error.message}</td></tr>`;
+                    }
+                }
+                
+                testResults += '</table>';
+                
+                const overallStatus = jobsWithoutCandidates === 0 ? 'success' : 'error';
+                const summary = `
+                    <h3>Summary:</h3>
+                    <div class="${overallStatus}">
+                        <strong>Jobs with Candidates:</strong> ${jobsWithCandidates}<br>
+                        <strong>Jobs without Candidates:</strong> ${jobsWithoutCandidates}<br>
+                        <strong>Total Candidates Found:</strong> ${totalCandidatesAcrossJobs}<br>
+                        <strong>Status:</strong> ${jobsWithoutCandidates === 0 ? '🎉 SUCCESS: All jobs have candidates!' : '⚠️ ISSUE: Some jobs have no candidates'}
+                    </div>
+                `;
+                
+                resultDiv.innerHTML = summary + testResults;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Test failed: ${error.message}</div>`;
+            }
+        }
+        
+        async function testUserWorkflow() {
+            const resultDiv = document.getElementById('workflow-result');
+            resultDiv.innerHTML = '<div>🎯 Testing complete user workflow...</div>';
+            
+            try {
+                // Simulate user workflow: Get Started → Jobs → Pick a job → Candidates
+                
+                // Step 1: Get jobs (simulating job management page)
+                const jobsResponse = await fetch('/api/jobs?page=1&pageSize=10');
+                if (!jobsResponse.ok) {
+                    throw new Error(`Jobs API failed: ${jobsResponse.status}`);
+                }
+                const jobsData = await jobsResponse.json();
+                const jobs = jobsData.data;
+                
+                if (jobs.length === 0) {
+                    resultDiv.innerHTML = '<div class="error">❌ No jobs found for workflow test</div>';
+                    return;
+                }
+                
+                // Step 2: Pick first job (simulating user clicking on a job)
+                const selectedJob = jobs[0];
+                
+                // Step 3: Get candidates for that job (simulating candidates page)
+                const candidatesResponse = await fetch(`/api/jobs/${selectedJob.id}/candidates?stage=all`);
+                if (!candidatesResponse.ok) {
+                    throw new Error(`Candidates API failed: ${candidatesResponse.status}`);
+                }
+                const candidates = await candidatesResponse.json();
+                
+                // Step 4: Analyze results
+                let workflowResult = `<h3>Workflow Test Results:</h3>`;
+                workflowResult += `<div class="success">✅ Step 1: Found ${jobs.length} jobs</div>`;
+                workflowResult += `<div class="success">✅ Step 2: Selected job "${selectedJob.title}" (ID: ${selectedJob.id})</div>`;
+                
+                if (candidates.length > 0) {
+                    // Verify all candidates belong to the correct job
+                    const wrongJobCandidates = candidates.filter(c => c.jobId !== selectedJob.id);
+                    
+                    if (wrongJobCandidates.length === 0) {
+                        workflowResult += `<div class="success">✅ Step 3: Found ${candidates.length} candidates for job ${selectedJob.id}</div>`;
+                        workflowResult += `<div class="success">🎉 SUCCESS: All candidates have correct jobId (${selectedJob.id})</div>`;
+                        
+                        workflowResult += `<h4>Sample Candidates:</h4><ul>`;
+                        candidates.slice(0, 5).forEach(c => {
+                            workflowResult += `<li><strong>${c.name}</strong> - ${c.currentStage} (JobId: ${c.jobId})</li>`;
+                        });
+                        workflowResult += '</ul>';
+                    } else {
+                        workflowResult += `<div class="error">❌ PROBLEM: Found ${wrongJobCandidates.length} candidates with wrong jobId</div>`;
+                        workflowResult += `<div class="error">Wrong candidates: ${wrongJobCandidates.map(c => `${c.name}(jobId:${c.jobId})`).join(', ')}</div>`;
+                    }
+                } else {
+                    workflowResult += `<div class="error">❌ Step 3 FAILED: No candidates found for job ${selectedJob.id}</div>`;
+                }
+                
+                resultDiv.innerHTML = workflowResult;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Workflow test failed: ${error.message}</div>`;
+            }
+        }
+        
+        // Auto-run tests on page load
+        window.onload = function() {
+            // Give some time for the database to be seeded
+            setTimeout(testJobSpecificCandidates, 2000);
+        };
+    </script>
+</body>
+</html>

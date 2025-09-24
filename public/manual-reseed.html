@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MANUAL RESEED</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; text-align: center; }
+        .big-button { 
+            background: #ff4444; 
+            color: white; 
+            padding: 30px 50px; 
+            font-size: 24px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            margin: 20px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+        }
+        .big-button:hover { background: #cc0000; }
+        .result { margin: 20px; padding: 20px; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+    </style>
+</head>
+<body>
+    <h1>🚨 EMERGENCY MANUAL RESEED</h1>
+    <p>If candidates are still not showing, use this emergency reseed.</p>
+    
+    <button onclick="manualReseed()" class="big-button">
+        🔄 MANUAL RESEED NOW
+    </button>
+    
+    <div id="result" class="result"></div>
+    
+    <h2>Then test:</h2>
+    <a href="/" style="font-size: 20px; color: #007cba;">🏠 Go to Main App</a>
+
+    <script>
+        async function manualReseed() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div>🔄 Starting manual reseed...</div>';
+            
+            try {
+                console.log('🔥 MANUAL RESEED: Starting...');
+                
+                // Import and run seeding directly
+                const { seedDatabase } = await import('/src/lib/database/seed.ts');
+                
+                resultDiv.innerHTML = '<div>🔄 Running seed function...</div>';
+                await seedDatabase();
+                
+                resultDiv.innerHTML = '<div class="success">✅ Manual reseed completed! Check console for details.</div>';
+                console.log('🔥 MANUAL RESEED: Completed!');
+                
+            } catch (error) {
+                console.error('🔥 MANUAL RESEED ERROR:', error);
+                resultDiv.innerHTML = `<div class="error">❌ Manual reseed failed: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

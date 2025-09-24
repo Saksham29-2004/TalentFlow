@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Job 1 Candidates</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+        button { margin: 10px; padding: 15px 20px; font-size: 16px; }
+    </style>
+</head>
+<body>
+    <h1>Debug Job 1 Candidates Issue</h1>
+    
+    <div class="section">
+        <h2>Test Job 1 Candidates (Homepage Flow)</h2>
+        <button onclick="testJob1()">Test Job 1 Candidates</button>
+        <div id="job1-result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Check All Jobs and Their Candidate Counts</h2>
+        <button onclick="checkAllJobs()">Check All Jobs</button>
+        <div id="all-jobs-result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Force Database Reseed</h2>
+        <button onclick="forceReseed()">Clear & Reseed Database</button>
+        <div id="reseed-result"></div>
+    </div>
+
+    <script>
+        async function testJob1() {
+            const resultDiv = document.getElementById('job1-result');
+            try {
+                resultDiv.innerHTML = '<div>🔍 Testing Job 1 candidates...</div>';
+                
+                const response = await fetch('/api/jobs/1/candidates?stage=all');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const candidates = await response.json();
+                
+                if (candidates.length > 0) {
+                    resultDiv.innerHTML = `
+                        <div class="success">✅ SUCCESS: Job 1 has ${candidates.length} candidates!</div>
+                        <h3>First 3 candidates:</h3>
+                        <ul>
+                            ${candidates.slice(0, 3).map(c => `<li><strong>${c.name}</strong> - ${c.currentStage} (${c.email})</li>`).join('')}
+                        </ul>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<div class="error">❌ PROBLEM: Job 1 has 0 candidates!</div>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ ERROR: ${error.message}</div>`;
+            }
+        }
+        
+        async function checkAllJobs() {
+            const resultDiv = document.getElementById('all-jobs-result');
+            try {
+                resultDiv.innerHTML = '<div>🔍 Checking all jobs...</div>';
+                
+                // Get all jobs first
+                const jobsResponse = await fetch('/api/jobs?page=1&pageSize=50');
+                if (!jobsResponse.ok) {
+                    throw new Error(`Failed to fetch jobs: ${jobsResponse.status}`);
+                }
+                const jobsData = await jobsResponse.json();
+                const jobs = jobsData.data;
+                
+                let summary = `<div class="success">✅ Found ${jobs.length} total jobs</div><h3>Candidate Distribution:</h3><ul>`;
+                
+                for (const job of jobs.slice(0, 10)) { // Check first 10 jobs
+                    try {
+                        const candidatesResponse = await fetch(`/api/jobs/${job.id}/candidates?stage=all`);
+                        if (candidatesResponse.ok) {
+                            const candidates = await candidatesResponse.json();
+                            const statusClass = candidates.length === 0 ? 'error' : 'success';
+                            summary += `<li class="${statusClass}"><strong>Job ${job.id}: ${job.title}</strong> - ${candidates.length} candidates</li>`;
+                        } else {
+                            summary += `<li class="error"><strong>Job ${job.id}: ${job.title}</strong> - API Error ${candidatesResponse.status}</li>`;
+                        }
+                    } catch (error) {
+                        summary += `<li class="error"><strong>Job ${job.id}: ${job.title}</strong> - Error: ${error.message}</li>`;
+                    }
+                }
+                
+                summary += '</ul>';
+                resultDiv.innerHTML = summary;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ ERROR: ${error.message}</div>`;
+            }
+        }
+        
+        async function forceReseed() {
+            const resultDiv = document.getElementById('reseed-result');
+            try {
+                resultDiv.innerHTML = '<div>🔄 Clearing database...</div>';
+                
+                // Clear IndexedDB
+                const databases = await indexedDB.databases();
+                for (const db of databases) {
+                    if (db.name === 'MyMockDatabase') {
+                        const deleteRequest = indexedDB.deleteDatabase(db.name);
+                        await new Promise((resolve, reject) => {
+                            deleteRequest.onsuccess = resolve;
+                            deleteRequest.onerror = reject;
+                        });
+                    }
+                }
+                
+                resultDiv.innerHTML = '<div class="success">✅ Database cleared! Refreshing page to trigger reseed...</div>';
+                
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>

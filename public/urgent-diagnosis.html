@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>URGENT DIAGNOSIS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .urgent { background: #dc3545; color: white; padding: 20px; margin-bottom: 20px; border-radius: 8px; }
+        .test { background: white; border: 2px solid #007cba; margin: 15px 0; padding: 15px; border-radius: 8px; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .warning { background: #fff3cd; color: #856404; }
+        button { padding: 12px 20px; font-size: 16px; border: none; border-radius: 4px; cursor: pointer; margin: 5px; }
+        .btn-primary { background: #007cba; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <div class="urgent">
+        <h1>🚨 URGENT DIAGNOSIS: No Candidates Issue</h1>
+        <p>Let's find out exactly what's wrong with the candidate data</p>
+    </div>
+    
+    <div class="test">
+        <h2>Test 1: Check if Database Exists</h2>
+        <button onclick="checkDatabase()" class="btn-primary">Check Database</button>
+        <div id="db-result" class="result"></div>
+    </div>
+    
+    <div class="test">
+        <h2>Test 2: Test API Endpoints</h2>
+        <button onclick="testAPI()" class="btn-primary">Test All APIs</button>
+        <div id="api-result" class="result"></div>
+    </div>
+    
+    <div class="test">
+        <h2>Test 3: Nuclear Option - Complete Reset</h2>
+        <button onclick="nuclearReset()" class="btn-danger">🔥 NUCLEAR RESET</button>
+        <div id="reset-result" class="result"></div>
+    </div>
+
+    <script>
+        async function checkDatabase() {
+            const resultDiv = document.getElementById('db-result');
+            resultDiv.innerHTML = '<div>🔍 Checking database...</div>';
+            
+            try {
+                // Check if IndexedDB exists
+                if (!window.indexedDB) {
+                    resultDiv.innerHTML = '<div class="error">❌ IndexedDB not supported</div>';
+                    return;
+                }
+                
+                // List all databases
+                const databases = await indexedDB.databases();
+                console.log('Available databases:', databases);
+                
+                let dbInfo = '<div class="success">✅ IndexedDB is available</div>';
+                dbInfo += `<h3>Available Databases:</h3><ul>`;
+                
+                for (const db of databases) {
+                    dbInfo += `<li><strong>${db.name}</strong> (version: ${db.version})</li>`;
+                }
+                dbInfo += '</ul>';
+                
+                // Try to open our specific database
+                const dbRequest = indexedDB.open('MyMockDatabase');
+                dbRequest.onsuccess = (event) => {
+                    const db = event.target.result;
+                    dbInfo += `<h3>MyMockDatabase Info:</h3>`;
+                    dbInfo += `<ul>`;
+                    dbInfo += `<li>Version: ${db.version}</li>`;
+                    dbInfo += `<li>Object Stores: ${Array.from(db.objectStoreNames).join(', ')}</li>`;
+                    dbInfo += `</ul>`;
+                    
+                    // Try to read data
+                    try {
+                        const transaction = db.transaction(['candidates', 'jobs'], 'readonly');
+                        const candidateStore = transaction.objectStore('candidates');
+                        const jobStore = transaction.objectStore('jobs');
+                        
+                        const candidateCount = candidateStore.count();
+                        const jobCount = jobStore.count();
+                        
+                        candidateCount.onsuccess = () => {
+                            dbInfo += `<h3>Data Counts:</h3><ul>`;
+                            dbInfo += `<li><strong>Candidates:</strong> ${candidateCount.result}</li>`;
+                            
+                            jobCount.onsuccess = () => {
+                                dbInfo += `<li><strong>Jobs:</strong> ${jobCount.result}</li>`;
+                                dbInfo += `</ul>`;
+                                
+                                if (candidateCount.result === 0) {
+                                    dbInfo += '<div class="error">❌ PROBLEM: No candidates in database!</div>';
+                                } else {
+                                    dbInfo += '<div class="success">✅ Candidates exist in database</div>';
+                                }
+                                
+                                resultDiv.innerHTML = dbInfo;
+                            };
+                        };
+                    } catch (error) {
+                        dbInfo += `<div class="error">❌ Error reading data: ${error.message}</div>`;
+                        resultDiv.innerHTML = dbInfo;
+                    }
+                };
+                
+                dbRequest.onerror = () => {
+                    dbInfo += '<div class="error">❌ Could not open MyMockDatabase</div>';
+                    resultDiv.innerHTML = dbInfo;
+                };
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Database check failed: ${error.message}</div>`;
+                console.error('Database check error:', error);
+            }
+        }
+        
+        async function testAPI() {
+            const resultDiv = document.getElementById('api-result');
+            resultDiv.innerHTML = '<div>🔍 Testing API endpoints...</div>';
+            
+            try {
+                let apiResults = '<h3>API Test Results:</h3>';
+                
+                // Test 1: Get all jobs
+                try {
+                    const jobsResponse = await fetch('/api/jobs?page=1&pageSize=10');
+                    if (jobsResponse.ok) {
+                        const jobsData = await jobsResponse.json();
+                        const jobs = jobsData.data || [];
+                        apiResults += `<div class="success">✅ Jobs API: ${jobs.length} jobs found</div>`;
+                        
+                        if (jobs.length > 0) {
+                            // Test 2: Get candidates for first job
+                            const firstJob = jobs[0];
+                            try {
+                                const candidatesResponse = await fetch(`/api/jobs/${firstJob.id}/candidates?stage=all`);
+                                if (candidatesResponse.ok) {
+                                    const candidates = await candidatesResponse.json();
+                                    if (candidates.length > 0) {
+                                        apiResults += `<div class="success">✅ Candidates API: ${candidates.length} candidates found for job ${firstJob.id}</div>`;
+                                        apiResults += `<div>First candidate: ${candidates[0].name} - ${candidates[0].currentStage}</div>`;
+                                    } else {
+                                        apiResults += `<div class="error">❌ PROBLEM: Job ${firstJob.id} has 0 candidates!</div>`;
+                                    }
+                                } else {
+                                    apiResults += `<div class="error">❌ Candidates API failed: ${candidatesResponse.status}</div>`;
+                                }
+                            } catch (candError) {
+                                apiResults += `<div class="error">❌ Candidates API error: ${candError.message}</div>`;
+                            }
+                        }
+                    } else {
+                        apiResults += `<div class="error">❌ Jobs API failed: ${jobsResponse.status}</div>`;
+                    }
+                } catch (jobError) {
+                    apiResults += `<div class="error">❌ Jobs API error: ${jobError.message}</div>`;
+                }
+                
+                resultDiv.innerHTML = apiResults;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ API test failed: ${error.message}</div>`;
+                console.error('API test error:', error);
+            }
+        }
+        
+        async function nuclearReset() {
+            const resultDiv = document.getElementById('reset-result');
+            resultDiv.innerHTML = '<div class="warning">🔥 Starting nuclear reset...</div>';
+            
+            try {
+                // Step 1: Clear all databases
+                const databases = await indexedDB.databases();
+                for (const db of databases) {
+                    console.log('Deleting database:', db.name);
+                    const deleteRequest = indexedDB.deleteDatabase(db.name);
+                    await new Promise((resolve) => {
+                        deleteRequest.onsuccess = resolve;
+                        deleteRequest.onerror = resolve;
+                        deleteRequest.onblocked = resolve;
+                    });
+                }
+                
+                // Step 2: Clear localStorage
+                localStorage.clear();
+                
+                // Step 3: Clear sessionStorage  
+                sessionStorage.clear();
+                
+                resultDiv.innerHTML = '<div class="success">✅ Nuclear reset complete! Reloading page in 3 seconds...</div>';
+                
+                // Step 4: Hard reload
+                setTimeout(() => {
+                    window.location.reload(true);
+                }, 3000);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Nuclear reset failed: ${error.message}</div>`;
+                console.error('Nuclear reset error:', error);
+            }
+        }
+        
+        // Auto-run diagnostics on page load
+        window.onload = function() {
+            setTimeout(checkDatabase, 500);
+            setTimeout(testAPI, 2000);
+        };
+    </script>
+</body>
+</html>

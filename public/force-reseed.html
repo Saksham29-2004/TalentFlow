@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Force Database Reseed</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        button { margin: 10px; padding: 15px 20px; font-size: 16px; }
+        .section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; }
+        .success { color: green; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Force Database Reseed</h1>
+    
+    <div class="section">
+        <h2>Clear IndexedDB and Force Reseed</h2>
+        <button onclick="clearAndReseed()">Clear Database & Reseed</button>
+        <div id="reseed-result"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Quick Test After Reseed</h2>
+        <button onclick="quickTest()">Test Product Manager Job Candidates</button>
+        <div id="test-result"></div>
+    </div>
+
+    <script>
+        async function clearAndReseed() {
+            const resultDiv = document.getElementById('reseed-result');
+            try {
+                resultDiv.innerHTML = '<div>🔄 Clearing database...</div>';
+                
+                // Clear IndexedDB
+                const databases = await indexedDB.databases();
+                for (const db of databases) {
+                    if (db.name === 'HiringPlatformDB') {
+                        const deleteRequest = indexedDB.deleteDatabase(db.name);
+                        await new Promise((resolve, reject) => {
+                            deleteRequest.onsuccess = resolve;
+                            deleteRequest.onerror = reject;
+                        });
+                    }
+                }
+                
+                resultDiv.innerHTML = '<div>✅ Database cleared. Refreshing page to trigger reseed...</div>';
+                
+                // Refresh the page to trigger reseed
+                setTimeout(() => {
+                    window.location.reload();
+                }, 2000);
+                
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+        
+        async function quickTest() {
+            const resultDiv = document.getElementById('test-result');
+            try {
+                // Test Job 2 (Product Manager) - this is typically what users would click on
+                const response = await fetch('/api/jobs/2/candidates?stage=all');
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const candidates = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="success">✅ Found ${candidates.length} candidates for Product Manager (Job ID: 2)</div>
+                    ${candidates.length > 0 ? `
+                        <h3>Sample candidates:</h3>
+                        <ul>
+                            ${candidates.slice(0, 5).map(c => `<li><strong>${c.name}</strong> - ${c.currentStage} (${c.email})</li>`).join('')}
+                        </ul>
+                    ` : '<div class="error">⚠️ No candidates found!</div>'}
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<div class="error">❌ Error: ${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html>
